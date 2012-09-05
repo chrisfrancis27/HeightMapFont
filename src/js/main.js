@@ -13,8 +13,9 @@
 			var CONST = {
 				width: 600,
 				height: 400,
-				fontfile: 'lib/fonts/optimer_regular.typeface.js',
-				coefficient: 700
+				fontfile: 'font',
+				coefficient: 1.2,
+				charWidth: 14
 			};
 			
 			// Inputs
@@ -29,12 +30,16 @@
 				material,
 				pointLight,
 				mesh,
+				obj,
 				mouseX = CONST.width / 2,
-				mouseY = CONST.height / 2;
+				mouseY = CONST.height / 2,
+				base_x = 0,
+				this_x = 0,
+				this_y = 0;
 				
 			require([
 				CONST.fontfile
-			], function () {
+			], function (font) {
 				// Form submit handler
 				var $form = $('#dataForm').on('submit', function(e) {
 					e.preventDefault();
@@ -56,33 +61,83 @@
 				});
 
 				function init() {
-					camera = new THREE.PerspectiveCamera( 50, CONST.width / CONST.height, 1, 10000 );
-					camera.position.z = 1000;
+					var glyph,
+						ch;
+				
+					camera = new THREE.PerspectiveCamera( 45, CONST.width / CONST.height, 1, 10000 );
+					camera.position.z = 50;
 
 					scene = new THREE.Scene();
+					obj = new THREE.Object3D();
+					
+					// Split input text into array of chars
+					var charArray = inputText.toUpperCase().split('');
+					console.log(charArray);
+					
+					
+					// Loop through char array
+					for (var i = 0, ii = charArray.length; i < ii; i++) {
+						ch = charArray[i];
+						
+						// Set initial character position
+						base_x = i * CONST.charWidth;
+						
+						// Find matching glyph
+						glyph = null;
+						for (var j = 0, jj = font.length; j < jj; j++) {
+							if (font[j].character === ch) {
+								glyph = font[j];
+								break;
+							}
+						}
+						if (!glyph) {
+							console.warn('Invalid character', ch);
+							break;
+						}
+						
+						console.log(glyph);
+						
+						// Plot a single point for every pixel
+						for (var k = 0, px = glyph.pixels, kk = px.length; k < kk; k++) {
+							// Update position
+							this_x = base_x + (k % 12);
+							this_y = -Math.floor(k / 12);
+							
+							// If we need to draw a pixel here...
+							if (px[k]) {
+								geometry = new THREE.SphereGeometry(0.5, 16, 16);
+								material = new THREE.MeshLambertMaterial({
+									color: 0xccccff,
+									wireframe: false
+								});
+								mesh = new THREE.Mesh(geometry, material);
+								mesh.position.x = this_x;
+								mesh.position.y = this_y;
+								mesh.position.z = 0;
+								
+								// Add the 'pixel' sphere to our main object
+								obj.add(mesh);
+							}
+						}
+					}
+					
+					// create a point light
+					pointLight = new THREE.PointLight(0xFFFFFF);
 
-					geometry = new THREE.TextGeometry( inputText, {
-						size: 150,
-						height: 20,
-						curveSegments: 2,
-						font: 'optimer'
-					});
-					geometry.computeBoundingBox();
-					var centerOffset = -0.5 * ( geometry.boundingBox.max.x - geometry.boundingBox.min.x );
-					
-					material = new THREE.MeshLambertMaterial( { color: 0x556688, wireframe: false } );
-					
+					// set its position
+					pointLight.position.x = 10;
+					pointLight.position.y = 50;
+					pointLight.position.z = 130;
+
+					// add to the scene
 					scene.add(pointLight);
-
-					mesh = new THREE.Mesh( geometry, material );
 					
-					mesh.position.x = centerOffset;
-					mesh.position.y = 100;
-					mesh.position.z = 0;
-					
-					scene.add( mesh );
+					// Add the pixel container object to the scene
+					scene.add(obj);
 
-					renderer = new THREE.CanvasRenderer();
+					renderer = new THREE.WebGLRenderer({
+						antialias: true
+					});
 					renderer.setSize( CONST.width, CONST.height );
 
 					document.body.appendChild( renderer.domElement );
@@ -92,9 +147,13 @@
 					// note: three.js includes requestAnimationFrame shim
 					requestAnimationFrame( animate );
 
-					mesh.rotation.x = (CONST.height - mouseY) / CONST.coefficient;
-					mesh.rotation.y = (CONST.width / 2 - mouseX) / CONST.coefficient;
-
+					camera.position.x = this_x / 2;
+					camera.position.y = -this_y / 2;
+					camera.position.z = this_x * CONST.coefficient;
+					camera.lookAt(new THREE.Vector3(this_x/2,this_y/2,0));
+					
+					obj.rotation.x = (-mouseY * CONST.coefficient) / CONST.height;
+					
 					renderer.render( scene, camera );
 				}
 			});
