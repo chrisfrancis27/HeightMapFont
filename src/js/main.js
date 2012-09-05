@@ -15,7 +15,9 @@
 				height: 400,
 				fontfile: 'font',
 				coefficient: 1.2,
-				charWidth: 14
+				charWidth: 15,
+				extrudeMin: 2,
+				extrudeMax: 20
 			};
 			
 			// Inputs
@@ -100,8 +102,8 @@
 						// Plot a single point for every pixel
 						for (var k = 0, px = glyph.pixels, kk = px.length; k < kk; k++) {
 							// Update position
-							this_x = base_x + (k % 12);
-							this_y = -Math.floor(k / 12);
+							this_x = base_x + (k % 14);
+							this_y = -Math.floor(k / 14);
 							
 							// If we need to draw a pixel here...
 							if (px[k]) {
@@ -125,9 +127,9 @@
 					pointLight = new THREE.PointLight(0xFFFFFF);
 
 					// set its position
-					pointLight.position.x = 10;
-					pointLight.position.y = 50;
-					pointLight.position.z = 130;
+					pointLight.position.x = this_x / 2;
+					pointLight.position.y = this_y / 2;
+					pointLight.position.z = 100;
 
 					// add to the scene
 					scene.add(pointLight);
