@@ -49,11 +49,45 @@
 					inputText = $(e.target[1]).val();
 					dataSource = $(e.target[3]).val();
 					
-					console.log('Text:',inputText);
-					console.log('Data source:',dataSource);
-
-					init();
-					animate();
+					if (dataSource) {
+						var xhr = $.ajax({
+							type: 'GET',
+							url: dataSource
+						}).done(function(res) {
+							console.log(res);
+							var i;
+							
+							// Get total pixel width of text
+							var pxWidth = inputText.length * CONST.charWidth;
+							// Get number of data points
+							var dataPoints = res.data.length;
+							// Get highest and lowest data points
+							var highest = 0, 
+								lowest = false,
+								range;
+							for (i = 0; i < dataPoints; i++) {
+								if (lowest === false) {
+									lowest = res.data[i].value;
+								}
+								highest = Math.max(highest, res.data[i].value);
+								lowest = Math.min(lowest, res.data[i].value);
+							}
+							range = highest - lowest;
+							// Create linear heightmap array
+							var heightMap = interpolate(pxWidth, res.data, lowest, range);
+							console.log('heightMap', heightMap);
+						
+							init(heightMap);
+							animate();
+						}).fail(function(jqXHR, status) {
+							console.error(status);
+							console.error(jqXHR.responseText);
+						});
+					}
+					else {
+						init();
+						animate();
+					}
 				});
 				
 				// Mousemove handler
@@ -62,7 +96,53 @@
 					mouseY = e.clientY;
 				});
 
-				function init() {
+				function interpolate(length, values, floor, range) {
+					var arr = [],
+						i,
+						j,
+						val,
+						left,
+						right,
+						diff,
+						diffTotal,
+						newRange = CONST.extrudeMax - CONST.extrudeMin;
+					
+					// Get the spacing between non-interpolated values
+					var spacing = (length - 1) / (values.length - 1);
+					
+					// Early out if 1:1 array mapping already
+					// (else we'll be dividing by 0, and people might get hurt)
+					if (spacing === 0) {
+						return values;
+					}
+					
+					for (i = 0; i < length; i++) {
+						j = Math.floor(i / spacing);
+						// No interpolation
+						if (i === 0 || i / spacing === j || i === length - 1) {
+							val = values[j].value;
+						}
+						// Yes interpolation :)
+						else {
+							left = values[j].value;
+							right = values[j + 1].value;
+							diffTotal = right - left;
+							//diffTotal = diffTotal < 0 ? -diffTotal : diffTotal;
+							diff = diffTotal / spacing;
+							val = left + (i % spacing) * diff;
+						}
+						
+						// Map val into new range
+						var valRatio = (val - floor) / range;
+						var newVal = Math.round(CONST.extrudeMin + newRange * valRatio);
+						
+						arr.push(newVal);
+					}
+					
+					return arr;
+				}
+				
+				function init(heightMap) {
 					var glyph,
 						ch;
 				
@@ -71,11 +151,15 @@
 
 					scene = new THREE.Scene();
 					obj = new THREE.Object3D();
+					geometry = new THREE.SphereGeometry(0.5, 4, 4);
+					material = new THREE.MeshLambertMaterial({
+						color: 0xccccff,
+						wireframe: false
+					});
 					
 					// Split input text into array of chars
 					var charArray = inputText.toUpperCase().split('');
 					console.log(charArray);
-					
 					
 					// Loop through char array
 					for (var i = 0, ii = charArray.length; i < ii; i++) {
@@ -97,8 +181,6 @@
 							break;
 						}
 						
-						console.log(glyph);
-						
 						// Plot a single point for every pixel
 						for (var k = 0, px = glyph.pixels, kk = px.length; k < kk; k++) {
 							// Update position
@@ -107,11 +189,6 @@
 							
 							// If we need to draw a pixel here...
 							if (px[k]) {
-								geometry = new THREE.SphereGeometry(0.5, 16, 16);
-								material = new THREE.MeshLambertMaterial({
-									color: 0xccccff,
-									wireframe: false
-								});
 								mesh = new THREE.Mesh(geometry, material);
 								mesh.position.x = this_x;
 								mesh.position.y = this_y;
@@ -119,6 +196,19 @@
 								
 								// Add the 'pixel' sphere to our main object
 								obj.add(mesh);
+								
+								// If we need to extrude upwards
+								if (heightMap) {
+									// Create higher z-indexed pixels
+									var z = 0;
+									for (var l = 0, ll = heightMap[this_x]; l < ll; l++) {
+										mesh = new THREE.Mesh(geometry, material);
+										mesh.position.x = this_x;
+										mesh.position.y = this_y;
+										mesh.position.z = ++z;
+										obj.add(mesh);
+									}
+								}
 							}
 						}
 					}
@@ -149,8 +239,8 @@
 					// note: three.js includes requestAnimationFrame shim
 					requestAnimationFrame( animate );
 
-					camera.position.x = this_x / 2;
-					camera.position.y = -this_y / 2;
+					camera.position.x = (this_x / 2) - (CONST.width / 2 - mouseX) / 20;
+					camera.position.y = 60;
 					camera.position.z = this_x * CONST.coefficient;
 					camera.lookAt(new THREE.Vector3(this_x/2,this_y/2,0));
 					
