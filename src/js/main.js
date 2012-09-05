@@ -11,9 +11,9 @@
         $(function () {
 			// Constants
 			var CONST = {
-				width: 600,
-				height: 400,
-				fontfile: 'font',
+				width: 1200,
+				height: 800,
+				fontfile: '../lib/fonts/terminal',
 				coefficient: 1.2,
 				charWidth: 15,
 				extrudeMin: 2,
@@ -144,7 +144,7 @@
 					var glyph,
 						ch;
 				
-					camera = new THREE.PerspectiveCamera( 45, CONST.width / CONST.height, 1, 10000 );
+					camera = new THREE.PerspectiveCamera( 50, CONST.width / CONST.height, 1, 10000 );
 					camera.position.z = 50;
 
 					scene = new THREE.Scene();
@@ -216,7 +216,7 @@
 					// set its position
 					pointLight.position.x = this_x / 2;
 					pointLight.position.y = this_y / 2;
-					pointLight.position.z = 100;
+					pointLight.position.z = 50;
 
 					// add to the scene
 					scene.add(pointLight);
