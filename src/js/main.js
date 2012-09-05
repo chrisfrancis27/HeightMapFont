@@ -54,7 +54,6 @@
 							type: 'GET',
 							url: dataSource
 						}).done(function(res) {
-							console.log(res);
 							var i;
 							
 							// Get total pixel width of text
@@ -75,7 +74,6 @@
 							range = highest - lowest;
 							// Create linear heightmap array
 							var heightMap = interpolate(pxWidth, res.data, lowest, range);
-							console.log('heightMap', heightMap);
 						
 							init(heightMap);
 							animate();
@@ -159,7 +157,6 @@
 					
 					// Split input text into array of chars
 					var charArray = inputText.toUpperCase().split('');
-					console.log(charArray);
 					
 					// Loop through char array
 					for (var i = 0, ii = charArray.length; i < ii; i++) {
@@ -178,7 +175,7 @@
 						}
 						if (!glyph) {
 							console.warn('Invalid character', ch);
-							break;
+							continue;
 						}
 						
 						// Plot a single point for every pixel
