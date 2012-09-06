@@ -39,9 +39,12 @@
 				this_x = 0,
 				this_y = 0;
 				
+			var pixelCount = 0;
+				
 			require([
-				CONST.fontfile
-			], function (font) {
+				CONST.fontfile,
+				'lib/tween.js'
+			], function (font, tween) {
 				// Form submit handler
 				var $form = $('#dataForm').on('submit', function(e) {
 					e.preventDefault();
@@ -73,13 +76,15 @@
 							}
 							range = highest - lowest;
 							// Create linear heightmap array
-							var heightMap = interpolate(pxWidth, res.data, lowest, range);
+							var heightMap = interpolate(pxWidth, res.data, lowest, range, TWEEN.Easing.Quadratic.InOut);
 						
 							init(heightMap);
 							animate();
 						}).fail(function(jqXHR, status) {
 							console.error(status);
 							console.error(jqXHR.responseText);
+							init();
+							animate();
 						});
 					}
 					else {
@@ -93,50 +98,85 @@
 					mouseX = e.clientX;
 					mouseY = e.clientY;
 				});
+				
+				function getTweenedValue(startVal, endVal, currentTime, totalTime, tweener) {
+					var delta = endVal - startVal;
+					var percentComplete = currentTime/totalTime;
+					tweener = tweener ? tweener : TWEEN.Easing.Linear.None;
+					
+					return tweener(percentComplete) * delta + startVal
+				}
+				
+				function mapRange(val, oldMin, oldMax, newMin, newMax) {
+					var valRatio = (val - oldMin) / (oldMax - oldMin);
+					return newMax * valRatio;
+				}
 
-				function interpolate(length, values, floor, range) {
+				function interpolate(length, values, floor, range, tweener) {
 					var arr = [],
 						i,
+						ii,
+						iii,
 						j,
 						val,
 						left,
 						right,
+						delta,
+						n,
 						diff,
 						diffTotal,
 						newRange = CONST.extrudeMax - CONST.extrudeMin;
-					
-					// Get the spacing between non-interpolated values
-					var spacing = (length - 1) / (values.length - 1);
-					
-					// Early out if 1:1 array mapping already
-					// (else we'll be dividing by 0, and people might get hurt)
-					if (spacing === 0) {
-						return values;
+						
+						
+					// Make array of x-positions corresponding to input dates	
+					var xArr = [],
+						xMax = values[values.length - 1].date,
+						xMin = values[0].date,
+						xDelta = xMax - xMin,
+						xRatio,
+						xPos;
+					for (i = 0; i < values.length; i++) {
+						xRatio = (values[i].date - xMin) / xDelta;
+						xPos = Math.ceil(xRatio * length);
+						xArr.push(xPos);
 					}
 					
-					for (i = 0; i < length; i++) {
-						j = Math.floor(i / spacing);
-						// No interpolation
-						if (i === 0 || i / spacing === j || i === length - 1) {
-							val = values[j].value;
+					// Tween each x-position
+					for (i = 0; i < xArr.length; i++) {
+						var prev = xArr[i],
+							next = xArr[i+1];
+						for (ii = prev; ii < next; ii++) {
+							// Get the spacing between non-interpolated values
+							delta = next - prev;
+							
+							for (iii = 0; iii < length; iii++) {
+								j = Math.floor(iii / (length / (xArr.length - 1)));
+							
+								// No interpolation
+								if (iii === 0 || iii / delta === j || iii === length - 1) {
+									//console.log(values[j]);
+									val = values[j].value;
+								}
+								// Yes interpolation :)
+								else {
+									n = iii % delta;
+									left = values[j];
+									right = values[j+1];
+									
+									val = getTweenedValue(
+										left.value,
+										right.value,
+										(right.date - left.date) * (n / delta),
+										right.date - left.date,
+										tweener
+									);
+								}
+								
+								// Map val into new range and push to array
+								arr.push(Math.round(mapRange(val, floor, range + floor, CONST.extrudeMin, CONST.extrudeMax)));
+							}
 						}
-						// Yes interpolation :)
-						else {
-							left = values[j].value;
-							right = values[j + 1].value;
-							diffTotal = right - left;
-							//diffTotal = diffTotal < 0 ? -diffTotal : diffTotal;
-							diff = diffTotal / spacing;
-							val = left + (i % spacing) * diff;
-						}
-						
-						// Map val into new range
-						var valRatio = (val - floor) / range;
-						var newVal = Math.round(CONST.extrudeMin + newRange * valRatio);
-						
-						arr.push(newVal);
 					}
-					
 					return arr;
 				}
 				
@@ -144,12 +184,12 @@
 					var glyph,
 						ch;
 				
-					camera = new THREE.PerspectiveCamera( 50, CONST.width / CONST.height, 1, 10000 );
-					camera.position.z = 50;
+					camera = new THREE.PerspectiveCamera( 10, CONST.width / CONST.height, 1, 10000 );
+					camera.position.z = 500;
 
 					scene = new THREE.Scene();
 					obj = new THREE.Object3D();
-					geometry = new THREE.SphereGeometry(0.5, 4, 4);
+					geometry = new THREE.SphereGeometry(0.5, 8, 8);
 					material = new THREE.MeshLambertMaterial({
 						color: 0xccccff,
 						wireframe: false
@@ -193,6 +233,7 @@
 								
 								// Add the 'pixel' sphere to our main object
 								obj.add(mesh);
+								pixelCount++;
 								
 								// If we need to extrude upwards
 								if (heightMap) {
@@ -204,6 +245,7 @@
 										mesh.position.y = this_y;
 										mesh.position.z = ++z;
 										obj.add(mesh);
+										pixelCount++;
 									}
 								}
 							}
@@ -230,6 +272,8 @@
 					renderer.setSize( CONST.width, CONST.height );
 
 					document.body.appendChild( renderer.domElement );
+					
+					console.log('Total pixels:',pixelCount);
 				}
 
 				function animate() {
@@ -237,8 +281,8 @@
 					requestAnimationFrame( animate );
 
 					camera.position.x = (this_x / 2) - (CONST.width / 2 - mouseX) / 20;
-					camera.position.y = 60;
-					camera.position.z = this_x * CONST.coefficient;
+					camera.position.y = 0;
+					camera.position.z = this_x * CONST.coefficient * 5;
 					camera.lookAt(new THREE.Vector3(this_x/2,this_y/2,0));
 					
 					obj.rotation.x = (-mouseY * CONST.coefficient) / CONST.height;

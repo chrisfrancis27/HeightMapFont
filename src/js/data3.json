@@ -1,0 +1,22 @@
+{
+	"data": [{
+		"date": 1,
+		"value": 5
+	},
+	{
+		"date": 2,
+		"value": 1
+	},
+	{
+		"date": 3,
+		"value": 5
+	},
+	{
+		"date": 4,
+		"value": 1
+	},
+	{
+		"date": 5,
+		"value": 5
+	}]
+}
