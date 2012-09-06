@@ -6,8 +6,9 @@
 	
     require(
     [
-        '../lib/jquery.min'
-    ], function (jQuery) {
+        '../lib/jquery.min',
+		'lib/tween.js'
+    ], function (jQuery, tween) {
         $(function () {
 			// Constants
 			var CONST = {
@@ -17,7 +18,15 @@
 				coefficient: 1.2,
 				charWidth: 15,
 				extrudeMin: 2,
-				extrudeMax: 20
+				extrudeMax: 10,
+				baseColorR: 0.4,
+				baseColorG: 0.6,
+				baseColorB: 0.8,
+				topColorR: 0.5,
+				topColorG: 0.9,
+				topColorB: 1,
+				shapeTween: TWEEN.Easing.Quadratic.InOut,
+				colorTween: TWEEN.Easing.Cubic.InOut
 			};
 			
 			// Inputs
@@ -29,6 +38,7 @@
 				scene,
 				renderer,
 				geometry,
+				color,
 				material,
 				pointLight,
 				mesh,
@@ -42,9 +52,8 @@
 			var pixelCount = 0;
 				
 			require([
-				CONST.fontfile,
-				'lib/tween.js'
-			], function (font, tween) {
+				CONST.fontfile
+			], function (font) {
 				// Form submit handler
 				var $form = $('#dataForm').on('submit', function(e) {
 					e.preventDefault();
@@ -76,7 +85,7 @@
 							}
 							range = highest - lowest;
 							// Create linear heightmap array
-							var heightMap = interpolate(pxWidth, res.data, lowest, range, TWEEN.Easing.Quadratic.InOut);
+							var heightMap = interpolate(pxWidth, res.data, lowest, range, CONST.shapeTween);
 						
 							init(heightMap);
 							animate();
@@ -190,10 +199,6 @@
 					scene = new THREE.Scene();
 					obj = new THREE.Object3D();
 					geometry = new THREE.SphereGeometry(0.5, 8, 8);
-					material = new THREE.MeshLambertMaterial({
-						color: 0xccccff,
-						wireframe: false
-					});
 					
 					// Split input text into array of chars
 					var charArray = inputText.toUpperCase().split('');
@@ -226,6 +231,11 @@
 							
 							// If we need to draw a pixel here...
 							if (px[k]) {
+								color = new THREE.Color().setRGB(CONST.baseColorR,CONST.baseColorG,CONST.baseColorB);
+								material = new THREE.MeshLambertMaterial({
+									color: color,
+									wireframe: false
+								});
 								mesh = new THREE.Mesh(geometry, material);
 								mesh.position.x = this_x;
 								mesh.position.y = this_y;
@@ -238,8 +248,25 @@
 								// If we need to extrude upwards
 								if (heightMap) {
 									// Create higher z-indexed pixels
-									var z = 0;
+									var z = 0,
+										r,
+										g,
+										b,
+										ratio;
+										
 									for (var l = 0, ll = heightMap[this_x]; l < ll; l++) {
+										ratio = (l - CONST.extrudeMin) / (CONST.extrudeMax - CONST.extrudeMin) * 10;
+										r = getTweenedValue(CONST.baseColorR, CONST.topColorR, ratio, CONST.extrudeMax, CONST.colorTween);
+										g = getTweenedValue(CONST.baseColorG, CONST.topColorG, ratio, CONST.extrudeMax, CONST.colorTween);
+										b = getTweenedValue(CONST.baseColorB, CONST.topColorB, ratio, CONST.extrudeMax, CONST.colorTween);
+										
+										color = new THREE.Color().setRGB(r,g,b);
+										
+										material = new THREE.MeshLambertMaterial({
+											color: color,
+											wireframe: false
+										});
+										
 										mesh = new THREE.Mesh(geometry, material);
 										mesh.position.x = this_x;
 										mesh.position.y = this_y;
